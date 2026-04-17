@@ -1,136 +1,585 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.js"></script>
-    <title>Resumable upload for Web Apps</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumable Upload for Web Apps</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { font-size: 1.5rem; color: #333; margin-bottom: 20px; }
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 20px;
+        }
+        .drop-zone:hover, .drop-zone.drag-over {
+            border-color: #4285f4;
+            background: #e8f0fe;
+        }
+        .drop-zone p { margin: 0; color: #666; }
+        .file-input { display: none; }
+        .settings {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .settings label { display: block; margin-bottom: 10px; font-weight: 500; }
+        .settings input, .settings select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .file-list {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .file-item:last-child { border-bottom: none; }
+        .file-icon {
+            width: 40px;
+            height: 40px;
+            background: #e8f0fe;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            font-size: 20px;
+        }
+        .file-info { flex: 1; }
+        .file-name { font-weight: 500; margin-bottom: 2px; }
+        .file-size { font-size: 12px; color: #666; }
+        .file-status { font-size: 12px; margin-top: 4px; }
+        .file-status.pending { color: #666; }
+        .file-status.uploading { color: #4285f4; }
+        .file-status.complete { color: #34a853; }
+        .file-status.error { color: #ea4335; }
+        .file-action {
+            background: none;
+            border: none;
+            color: #666;
+            cursor: pointer;
+            padding: 8px;
+            font-size: 18px;
+        }
+        .file-action:hover { color: #333; }
+        .file-action.remove:hover { color: #ea4335; }
+        .progress-container {
+            background: #eee;
+            height: 4px;
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #4285f4;
+            transition: width 0.2s;
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-primary {
+            background: #4285f4;
+            color: white;
+        }
+        .btn-primary:hover { background: #3367d6; }
+        .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-secondary {
+            background: #eee;
+            color: #333;
+        }
+        .btn-secondary:hover { background: #ddd; }
+        .stats {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            text-align: center;
+        }
+        .stat-value { font-size: 1.2rem; font-weight: 600; }
+        .stat-label { font-size: 12px; color: #666; }
+        .error-message {
+            background: #fce8e6;
+            color: #c5221f;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
 </head>
-
 <body>
-    <form>
-        <input name="file" id="uploadfile" type="file">
-    </form>
-    <div id="progress"></div>
+    <h1>Resumable Upload for Google Drive</h1>
+
+    <div class="drop-zone" id="dropZone">
+        <p>Drag & drop files here<br>or click to select</p>
+        <input type="file" class="file-input" id="fileInput" multiple>
+    </div>
+
+    <div class="settings">
+        <label>Chunk Size (MB)</label>
+        <select id="chunkSize">
+            <option value="5242880">5 MB</option>
+            <option value="10485760">10 MB</option>
+            <option value="15728640">15 MB</option>
+            <option value="20971520">20 MB</option>
+            <option value="52428800">50 MB</option>
+            <option value="104857600">100 MB</option>
+            <option value="262144000">250 MB</option>
+            <option value="524288000">500 MB</option>
+            <option value="1073741824" selected>1 GB</option>
+        </select>
+    </div>
+
+    <div class="file-list" id="fileList" style="display: none;"></div>
+
+    <div class="actions">
+        <button class="btn btn-primary" id="uploadBtn" disabled>Upload Files</button>
+        <button class="btn btn-secondary" id="cancelBtn" style="display: none;">Cancel</button>
+    </div>
+
+    <div class="stats" id="stats" style="display: none;">
+        <div>
+            <div class="stat-value" id="speed">0 MB/s</div>
+            <div class="stat-label">Speed</div>
+        </div>
+        <div>
+            <div class="stat-value" id="remaining">--</div>
+            <div class="stat-label">Remaining</div>
+        </div>
+        <div>
+            <div class="stat-value" id="overallProgress">0%</div>
+            <div class="stat-label">Progress</div>
+        </div>
+    </div>
+
+    <div class="error-message" id="errorMessage" style="display: none;"></div>
 
 <script>
-    const chunkSize = 5242880;
+(function() {
+    'use strict';
 
-    $('#uploadfile').on("change", function() {
-        var file = this.files[0];
-        if (file.name != "") {
-            var fr = new FileReader();
-            fr.fileName = file.name;
-            fr.fileSize = file.size;
-            fr.fileType = file.type;
-            fr.onload = init;
-            fr.readAsArrayBuffer(file);
-        }
+    const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024;
+    const MAX_FILES = 100;
+    const CHUNK_SIZE_OPTIONS = [5242880, 10485760, 15728640, 20971520];
+    const MAX_RETRIES = 3;
+    const RETRY_DELAY = 1000;
+
+    let files = [];
+    let uploadedSize = 0;
+    let totalSize = 0;
+    let isUploading = false;
+    let isCancelled = false;
+    let uploadStartTime = 0;
+    let abortedControllers = new Map();
+
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileList = document.getElementById('fileList');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const stats = document.getElementById('stats');
+    const errorMessage = document.getElementById('errorMessage');
+    const chunkSizeSelect = document.getElementById('chunkSize');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', handleFileSelect);
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
     });
 
-    function init() {
-        $("#progress").text("Initializing.");
-        var fileName = this.fileName;
-        var fileSize = this.fileSize;
-        var fileType = this.fileType;
-        console.log({fileName: fileName, fileSize: fileSize, fileType: fileType});
-        var buf = this.result;
-        var chunkpot = getChunkpot(chunkSize, fileSize);
-        var uint8Array = new Uint8Array(buf);
-        var chunks = chunkpot.chunks.map(function(e) {
-            return {
-                data: uint8Array.slice(e.startByte, e.endByte + 1),
-                length: e.numByte,
-                range: "bytes " + e.startByte + "-" + e.endByte + "/" + chunkpot.total,
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        handleFiles(e.dataTransfer.files);
+    });
+
+    uploadBtn.addEventListener('click', startUpload);
+    cancelBtn.addEventListener('click', cancelUpload);
+
+    function handleFileSelect(e) {
+        handleFiles(e.target.files);
+        fileInput.value = '';
+    }
+
+    function handleFiles(fileList) {
+        const newFiles = Array.from(fileList);
+        const currentCount = files.length;
+
+        if (currentCount + newFiles.length > MAX_FILES) {
+            showError(`Maximum ${MAX_FILES} files allowed`);
+            return;
+        }
+
+        newFiles.forEach(file => {
+            if (file.size > MAX_FILE_SIZE) {
+                showError(`File "${file.name}" exceeds 5GB limit`);
+                return;
+            }
+            if (file.size === 0) {
+                showError(`File "${file.name}" is empty`);
+                return;
+            }
+
+            const fileObj = {
+                id: generateId(),
+                file: file,
+                name: file.name,
+                size: file.size,
+                type: file.type || 'application/octet-stream',
+                status: 'pending',
+                progress: 0,
+                error: null,
+                retries: 0
             };
+            files.push(fileObj);
         });
-        google.script.run.withSuccessHandler(function(at) {
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable");
-            xhr.setRequestHeader('Authorization', "Bearer " + at);
-            xhr.setRequestHeader('Content-Type', "application/json");
-            xhr.send(JSON.stringify({
-                mimeType: fileType,
-                name: fileName,
-            }));
-            xhr.onload = function() {
-                doUpload({
-                    location: xhr.getResponseHeader("location"),
-                    chunks: chunks,
-                });
-            };
-            xhr.onerror = function() {
-                console.log(xhr.response);
-            };
-        }).getAt();
+
+        renderFileList();
+        updateUI();
     }
 
-    function doUpload(e) {
-        var chunks = e.chunks;
-        var location = e.location;
-        var cnt = 0;
-        var end = chunks.length;
-        var temp = function callback(cnt) {
-            var e = chunks[cnt];
-            var xhr = new XMLHttpRequest();
-            xhr.open("PUT", location, true);
-            xhr.setRequestHeader('Content-Range', e.range);
-            xhr.send(e.data);
-            xhr.onloadend = function() {
-                var status = xhr.status;
-                cnt += 1;
-                console.log("Uploading: " + status + " (" + cnt + " / " + end + ")");
-                $("#progress").text("Uploading: " + Math.floor(100 * cnt / end) + "%");
-                if (status == 308) {
-                    callback(cnt);
-                } else if (status == 200) {
-                    $("#progress").text("Done.");
-                } else {
-                    $("#progress").text("Error: " + xhr.response);
-                }
-            };
-        }(cnt);
+    function generateId() {
+        return Math.random().toString(36).substr(2, 9);
     }
 
-    function getChunkpot(chunkSize, fileSize) {
-        var chunkPot = {};
-        chunkPot.total = fileSize;
-        chunkPot.chunks = [];
-        if (fileSize > chunkSize) {
-            var numE = chunkSize;
-            var endS = function(f, n) {
-                var c = f % n;
-                if (c == 0) {
-                    return 0;
-                } else {
-                    return c;
+    function formatSize(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    function formatTime(seconds) {
+        if (seconds < 60) return seconds + 's';
+        if (seconds < 3600) return Math.floor(seconds / 60) + 'm';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        return h + 'h ' + m + 'm';
+    }
+
+    function renderFileList() {
+        if (files.length === 0) {
+            fileList.style.display = 'none';
+            return;
+        }
+
+        fileList.style.display = 'block';
+        fileList.innerHTML = files.map(f => `
+            <div class="file-item" data-id="${f.id}">
+                <div class="file-icon">📄</div>
+                <div class="file-info">
+                    <div class="file-name">${escapeHtml(f.name)}</div>
+                    <div class="file-size">${formatSize(f.size)}</div>
+                    <div class="file-status ${f.status}">${getStatusText(f)}</div>
+                    ${f.status === 'uploading' ? `
+                        <div class="progress-container">
+                            <div class="progress-bar" style="width: ${f.progress}%"></div>
+                        </div>
+                    ` : ''}
+                </div>
+                <button class="file-action remove" data-id="${f.id}" ${isUploading ? 'disabled' : ''}>✕</button>
+            </div>
+        `).join('');
+
+        fileList.querySelectorAll('.file-action.remove').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                if (!isUploading) {
+                    const id = e.target.dataset.id;
+                    files = files.filter(f => f.id !== id);
+                    renderFileList();
+                    updateUI();
                 }
-            }(fileSize, numE);
-            var repeat = Math.floor(fileSize / numE);
-            for (var i = 0; i <= repeat; i++) {
-                var startAddress = i * numE;
-                var c = {};
-                c.startByte = startAddress;
-                if (i < repeat) {
-                    c.endByte = startAddress + numE - 1;
-                    c.numByte = numE;
-                    chunkPot.chunks.push(c);
-                } else if (i == repeat && endS > 0) {
-                    c.endByte = startAddress + endS - 1;
-                    c.numByte = endS;
-                    chunkPot.chunks.push(c);
+            });
+        });
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function getStatusText(file) {
+        switch (file.status) {
+            case 'pending': return 'Pending';
+            case 'uploading': return `Uploading ${file.progress}%`;
+            case 'complete': return 'Complete';
+            case 'error': return file.error || 'Error';
+            default: return file.status;
+        }
+    }
+
+    function updateUI() {
+        const hasPending = files.some(f => f.status === 'pending');
+        uploadBtn.disabled = !hasPending || isUploading;
+        cancelBtn.style.display = isUploading ? 'block' : 'none';
+        stats.style.display = isUploading ? 'grid' : 'none';
+    }
+
+    function showError(message) {
+        errorMessage.textContent = message;
+        errorMessage.style.display = 'block';
+        setTimeout(() => {
+            errorMessage.style.display = 'none';
+        }, 5000);
+    }
+
+    async function startUpload() {
+        if (isUploading) return;
+
+        const pendingFiles = files.filter(f => f.status === 'pending');
+        if (pendingFiles.length === 0) return;
+
+        isUploading = true;
+        isCancelled = false;
+        uploadedSize = 0;
+        totalSize = pendingFiles.reduce((sum, f) => sum + f.size, 0);
+        uploadStartTime = Date.now();
+
+        for (const file of pendingFiles) {
+            if (isCancelled) break;
+            try {
+                await uploadFile(file);
+            } catch (err) {
+                file.status = 'error';
+                file.error = err.message;
+                console.error('Upload error:', err);
+            }
+            renderFileList();
+        }
+
+        isUploading = false;
+        updateStats();
+        updateUI();
+    }
+
+    async function uploadFile(fileObj) {
+        fileObj.status = 'uploading';
+        fileObj.progress = 0;
+        renderFileList();
+        updateUI();
+
+        const chunkSize = parseInt(chunkSizeSelect.value);
+        const chunks = getChunks(fileObj.file, chunkSize);
+
+        const accessToken = await getAccessToken();
+
+        const initResponse = await fetchWithAbort(
+            'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    mimeType: fileObj.type,
+                    name: fileObj.name
+                })
+            },
+            fileObj.id
+        );
+
+        if (!initResponse.ok) {
+            throw new Error('Failed to initialize upload: ' + initResponse.status);
+        }
+
+        const location = initResponse.headers.get('location');
+        if (!location) {
+            throw new Error('No upload location received');
+        }
+
+        const chunkControllers = [];
+        for (let i = 0; i < chunks.length; i++) {
+            if (isCancelled) break;
+
+            try {
+                await uploadChunkWithRetry(location, chunks[i], fileObj);
+                fileObj.progress = Math.round((i + 1) / chunks.length * 100);
+                uploadedSize += chunks[i].numByte;
+                renderFileList();
+                updateStats();
+            } catch (err) {
+                if (isCancelled) break;
+                throw err;
+            }
+        }
+
+        if (!isCancelled) {
+            fileObj.status = 'complete';
+            fileObj.progress = 100;
+        }
+    }
+
+    async function uploadChunkWithRetry(location, chunk, fileObj) {
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            if (isCancelled) return;
+
+            try {
+                await uploadChunk(location, chunk);
+                return;
+            } catch (err) {
+                if (attempt < MAX_RETRIES && !isCancelled) {
+                    await sleep(RETRY_DELAY * (attempt + 1));
+                    fileObj.retries++;
+                } else {
+                    throw err;
                 }
             }
-        } else {
-            var chunk = {
+        }
+    }
+
+    async function uploadChunk(location, chunk) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('PUT', location);
+            xhr.setRequestHeader('Content-Range', chunk.range);
+            xhr.setRequestHeader('Content-Length', chunk.numByte);
+
+            xhr.onload = () => {
+                if (xhr.status === 200 || xhr.status === 201) {
+                    resolve(xhr);
+                } else if (xhr.status === 308) {
+                    resolve(xhr);
+                } else {
+                    reject(new Error('Upload failed: ' + xhr.status));
+                }
+            };
+
+            xhr.onerror = () => reject(new Error('Network error'));
+            xhr.send(chunk.data);
+        });
+    }
+
+    async function fetchWithAbort(url, options, fileId) {
+        const controller = new AbortController();
+        abortedControllers.set(fileId, controller);
+
+        try {
+            const response = await fetch(url, {
+                ...options,
+                signal: controller.signal
+            });
+            return response;
+        } finally {
+            abortedControllers.delete(fileId);
+        }
+    }
+
+    function getChunks(file, chunkSize) {
+        const chunks = [];
+        const fileSize = file.size;
+
+        if (fileSize <= chunkSize) {
+            chunks.push({
                 startByte: 0,
                 endByte: fileSize - 1,
                 numByte: fileSize,
-            };
-            chunkPot.chunks.push(chunk);
+                range: `bytes 0-${fileSize - 1}/${fileSize}`
+            });
+            return chunks;
         }
-        return chunkPot;
+
+        let startByte = 0;
+        let chunkIndex = 0;
+        while (startByte < fileSize) {
+            const endByte = Math.min(startByte + chunkSize - 1, fileSize - 1);
+            const numByte = endByte - startByte + 1;
+            chunks.push({
+                startByte: startByte,
+                endByte: endByte,
+                numByte: numByte,
+                range: `bytes ${startByte}-${endByte}/${fileSize}`
+            });
+            startByte = endByte + 1;
+            chunkIndex++;
+        }
+
+        return chunks;
     }
+
+    async function getAccessToken() {
+        return new Promise((resolve, reject) => {
+            google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getAt();
+        });
+    }
+
+    function updateStats() {
+        const elapsed = (Date.now() - uploadStartTime) / 1000;
+        const speed = uploadedSize / elapsed;
+        const remaining = totalSize - uploadedSize;
+        const remainingTime = remaining / speed;
+
+        document.getElementById('speed').textContent = formatSize(speed) + '/s';
+        document.getElementById('remaining').textContent = isFinite(remainingTime) ? formatTime(Math.round(remainingTime)) : '--';
+        document.getElementById('overallProgress').textContent = Math.round(uploadedSize / totalSize * 100) + '%';
+    }
+
+    function cancelUpload() {
+        isCancelled = true;
+        abortedControllers.forEach(controller => {
+            controller.abort();
+        });
+        abortedControllers.clear();
+
+        files.forEach(f => {
+            if (f.status === 'uploading') {
+                f.status = 'cancelled';
+            }
+        });
+
+        renderFileList();
+        updateUI();
+    }
+
+    function sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+})();
 </script>
 </body>
-
 </html>
