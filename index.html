@@ -15,35 +15,6 @@
         }
         h1 { font-size: 1.5rem; color: #333; margin-bottom: 20px; }
         .hidden { display: none !important; }
-        .storage-info {
-            background: #e8f5e9;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            text-align: left;
-        }
-        .storage-info .label {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 4px;
-        }
-        .storage-info .value {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #1b5e20;
-        }
-        .storage-info .usage-bar {
-            height: 6px;
-            background: #c8e6c9;
-            border-radius: 3px;
-            margin-top: 8px;
-            overflow: hidden;
-        }
-        .storage-info .usage-fill {
-            height: 100%;
-            background: #4caf50;
-            transition: width 0.3s;
-        }
         .drop-zone {
             border: 2px dashed #ccc;
             border-radius: 8px;
@@ -63,12 +34,21 @@
             cursor: not-allowed;
         }
         .drop-zone p { margin: 0; color: #666; }
-        .drop-zone .hint {
-            font-size: 12px;
-            color: #999;
-            margin-top: 8px;
-        }
         .file-input { display: none; }
+        .settings {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .settings label { display: block; margin-bottom: 10px; font-weight: 500; }
+        .settings select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
         .file-list {
             background: white;
             border-radius: 8px;
@@ -156,7 +136,6 @@
             color: #333;
         }
         .btn-secondary:hover { background: #ddd; }
-        .btn-secondary:disabled { color: #ccc; cursor: not-allowed; }
         .stats {
             background: white;
             padding: 15px;
@@ -175,75 +154,54 @@
             border-radius: 4px;
             margin-bottom: 20px;
         }
-        .loading {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-            color: #666;
-        }
-        .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid #ddd;
-            border-top-color: #4285f4;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin-right: 10px;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
     </style>
 </head>
 <body>
     <h1>Resumable Upload for Google Drive</h1>
 
-    <div id="mainContent">
-        <div class="storage-info">
-            <div class="label">Storage Available</div>
-            <div class="value" id="storageRemaining">--</div>
-            <div class="usage-bar">
-                <div class="usage-fill" id="storageUsage" style="width: 0%"></div>
-            </div>
-            <div class="label" style="margin-top: 4px;" id="storageUsed">--</div>
-        </div>
-
-        <div class="drop-zone" id="dropZone">
-            <p>Drag & drop files here<br>or click to select</p>
-            <div class="hint">Max file size: <span id="maxFileSize">--</span></div>
-            <input type="file" class="file-input" id="fileInput" multiple>
-        </div>
-
-        <div class="file-list" id="fileList"></div>
-
-        <div class="actions">
-            <button class="btn btn-primary" id="uploadBtn" disabled>Upload Files</button>
-            <button class="btn btn-secondary" id="cancelBtn" class="hidden">Cancel</button>
-        </div>
-
-        <div class="stats" id="stats" class="hidden">
-            <div>
-                <div class="stat-value" id="speed">0 MB/s</div>
-                <div class="stat-label">Speed</div>
-            </div>
-            <div>
-                <div class="stat-value" id="remaining">--</div>
-                <div class="stat-label">Remaining</div>
-            </div>
-            <div>
-                <div class="stat-value" id="overallProgress">0%</div>
-                <div class="stat-label">Progress</div>
-            </div>
-        </div>
-
-        <div class="error-message" id="errorMessage" class="hidden"></div>
+    <div class="drop-zone" id="dropZone">
+        <p>Drag & drop files here<br>or click to select</p>
+        <input type="file" class="file-input" id="fileInput" multiple>
     </div>
 
-    <div id="loadingScreen" class="loading hidden">
-        <div class="spinner"></div>
-        <span>Loading...</span>
+    <div class="settings">
+        <label>Chunk Size</label>
+        <select id="chunkSize">
+            <option value="5242880">5 MB</option>
+            <option value="10485760">10 MB</option>
+            <option value="15728640">15 MB</option>
+            <option value="20971520">20 MB</option>
+            <option value="52428800">50 MB</option>
+            <option value="104857600">100 MB</option>
+            <option value="262144000">250 MB</option>
+            <option value="524288000">500 MB</option>
+            <option value="1073741824" selected>1 GB</option>
+        </select>
     </div>
+
+    <div class="file-list" id="fileList"></div>
+
+    <div class="actions">
+        <button class="btn btn-primary" id="uploadBtn" disabled>Upload Files</button>
+        <button class="btn btn-secondary" id="cancelBtn" class="hidden">Cancel</button>
+    </div>
+
+    <div class="stats" id="stats" class="hidden">
+        <div>
+            <div class="stat-value" id="speed">0 MB/s</div>
+            <div class="stat-label">Speed</div>
+        </div>
+        <div>
+            <div class="stat-value" id="remaining">--</div>
+            <div class="stat-label">Remaining</div>
+        </div>
+        <div>
+            <div class="stat-value" id="overallProgress">0%</div>
+            <div class="stat-label">Progress</div>
+        </div>
+    </div>
+
+    <div class="error-message" id="errorMessage" class="hidden"></div>
 
 <script>
 (function() {
@@ -260,21 +218,15 @@
     let isCancelled = false;
     let uploadStartTime = 0;
     let abortedControllers = new Map();
-    let storageQuota = { limit: 0, used: 0, remaining: 0 };
 
-    const mainContent = document.getElementById('mainContent');
-    const loadingScreen = document.getElementById('loadingScreen');
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
+    const chunkSizeSelect = document.getElementById('chunkSize');
     const fileList = document.getElementById('fileList');
     const uploadBtn = document.getElementById('uploadBtn');
     const cancelBtn = document.getElementById('cancelBtn');
     const stats = document.getElementById('stats');
     const errorMessage = document.getElementById('errorMessage');
-    const storageRemaining = document.getElementById('storageRemaining');
-    const storageUsed = document.getElementById('storageUsed');
-    const storageUsage = document.getElementById('storageUsage');
-    const maxFileSizeEl = document.getElementById('maxFileSize');
 
     dropZone.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', handleFileSelect);
@@ -297,33 +249,6 @@
     uploadBtn.addEventListener('click', startUpload);
     cancelBtn.addEventListener('click', cancelUpload);
 
-    async function getStorageQuota() {
-        return new Promise((resolve, reject) => {
-            google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .getStorageQuota();
-        });
-    }
-
-    function updateStorageDisplay() {
-        storageRemaining.textContent = formatSize(storageQuota.remaining);
-        storageUsed.textContent = formatSize(storageQuota.used) + ' used';
-        const usedPercent = storageQuota.limit > 0 ? (storageQuota.used / storageQuota.limit * 100) : 0;
-        storageUsage.style.width = usedPercent + '%';
-        maxFileSizeEl.textContent = formatSize(storageQuota.remaining);
-    }
-
-    function calculateChunkSize(fileSize) {
-        if (fileSize <= 5 * 1024 * 1024) return 5 * 1024 * 1024;
-        if (fileSize <= 10 * 1024 * 1024) return 10 * 1024 * 1024;
-        if (fileSize <= 50 * 1024 * 1024) return 15 * 1024 * 1024;
-        if (fileSize <= 100 * 1024 * 1024) return 20 * 1024 * 1024;
-        if (fileSize <= 500 * 1024 * 1024) return 50 * 1024 * 1024;
-        if (fileSize <= 1024 * 1024 * 1024) return 100 * 1024 * 1024;
-        return Math.min(250 * 1024 * 1024, Math.floor(storageQuota.remaining / 10));
-    }
-
     function handleFileSelect(e) {
         handleFiles(e.target.files);
         fileInput.value = '';
@@ -331,25 +256,17 @@
 
     function handleFiles(fileList) {
         const newFiles = Array.from(fileList);
-        const currentCount = files.length;
-        const maxFile = storageQuota.remaining;
 
-        if (currentCount + newFiles.length > MAX_FILES) {
+        if (files.length + newFiles.length > MAX_FILES) {
             showError(`Maximum ${MAX_FILES} files allowed`);
             return;
         }
 
         newFiles.forEach(file => {
-            if (file.size > maxFile) {
-                showError(`File "${file.name}" exceeds available storage (${formatSize(maxFile)})`);
-                return;
-            }
             if (file.size === 0) {
                 showError(`File "${file.name}" is empty`);
                 return;
             }
-
-            const chunkSize = calculateChunkSize(file.size);
 
             const fileObj = {
                 id: generateId(),
@@ -357,7 +274,7 @@
                 name: file.name,
                 size: file.size,
                 type: file.type || 'application/octet-stream',
-                chunkSize: chunkSize,
+                chunkSize: parseInt(chunkSizeSelect.value),
                 status: 'pending',
                 progress: 0,
                 error: null,
@@ -401,7 +318,7 @@
                 <div class="file-icon">📄</div>
                 <div class="file-info">
                     <div class="file-name" title="${escapeHtml(f.name)}">${escapeHtml(f.name)}</div>
-                    <div class="file-size">${formatSize(f.size)} (chunk: ${formatSize(f.chunkSize)})</div>
+                    <div class="file-size">${formatSize(f.size)}</div>
                     <div class="file-status ${f.status}">${getStatusText(f)}</div>
                     ${f.status === 'uploading' ? `
                         <div class="progress-container">
@@ -455,13 +372,6 @@
         setTimeout(() => {
             errorMessage.classList.add('hidden');
         }, 5000);
-    }
-
-    function showLoading(show) {
-        loadingScreen.classList.toggle('hidden', !show);
-        if (show) {
-            mainContent.classList.add('hidden');
-        }
     }
 
     async function startUpload() {
@@ -676,19 +586,6 @@
     function sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
-
-    async function init() {
-        showLoading(true);
-        try {
-            storageQuota = await getStorageQuota();
-            updateStorageDisplay();
-        } catch (err) {
-            showError('Failed to load storage info: ' + err.message);
-        }
-        showLoading(false);
-    }
-
-    init();
 })();
 </script>
 </body>
