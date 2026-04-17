@@ -330,16 +330,34 @@
     async function authenticate() {
         showLoading(true);
         try {
+            const token = await getAccessToken();
             storageQuota = await getStorageQuota();
             isAuthenticated = true;
             loginScreen.classList.add('hidden');
             mainContent.classList.remove('hidden');
             updateStorageDisplay();
         } catch (err) {
-            showError('Authentication failed: ' + err.message);
+            showError('Failed to connect: ' + err.message);
             showLoading(false);
         }
     }
+
+    async function quickLogin() {
+        showLoading(true);
+        try {
+            await getAccessToken();
+            storageQuota = await getStorageQuota();
+            isAuthenticated = true;
+            loginScreen.classList.add('hidden');
+            mainContent.classList.remove('hidden');
+            updateStorageDisplay();
+        } catch (err) {
+            console.log('Auto-login failed, waiting for user');
+            showLoading(false);
+        }
+    }
+
+    quickLogin();
 
     async function getStorageQuota() {
         return new Promise((resolve, reject) => {
